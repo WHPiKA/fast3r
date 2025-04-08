@@ -14,7 +14,7 @@ from typing import Optional
 
 import torch
 import torch.nn.functional as F
-from torch.nn.attention import SDPBackend
+# from torch.nn.attention import SDPBackend
 from torch import nn
 
 
@@ -235,7 +235,7 @@ class Attention(nn.Module):
         xv = values.transpose(1, 2)  # (bs, n_local_heads, seqlen, head_dim)
 
         # we use casual mask for training
-        with torch.nn.attention.sdpa_kernel(SDPBackend.FLASH_ATTENTION):
+        with torch.backends.cuda.sdp_kernel(enable_flash=True, enable_math=False, enable_mem_efficient=False):
             dtype = xk.dtype
             with torch.autocast("cuda", dtype=torch.bfloat16):
                 output = F.scaled_dot_product_attention(xq, xk, xv, is_causal=self.is_causal)

@@ -1,4 +1,8 @@
 logs
+*tmp*
+*example*
+.gradio/
+Fast3R_ViT_Large_512/
 
 notebooks/figures/
 notebooks/output/

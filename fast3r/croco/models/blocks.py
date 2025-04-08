@@ -27,7 +27,8 @@ import math
 import torch
 import torch.nn as nn
 from torch.nn.functional import scaled_dot_product_attention
-from torch.nn.attention import SDPBackend
+# import torch.backends.cuda.SDPBackend as SDPBackend
+# from torch.nn.attention import SDPBackend
 
 
 def _ntuple(n):
@@ -159,7 +160,7 @@ class Attention(nn.Module):
             assert self.attn_mask is None, "attn_mask not supported for pytorch_naive implementation of scaled dot product attention"
             assert self.is_causal is False, "is_causal not supported for pytorch_naive implementation of scaled dot product attention"
             dtype = k.dtype
-            with torch.autocast("cuda", dtype=torch.bfloat16):
+            with torch.autocast("cuda", dtype=torch.float16):
                 x = (q @ k.transpose(-2, -1)) * scale
                 x = x.softmax(dim=-1)
                 x = self.attn_drop(x)
@@ -169,9 +170,9 @@ class Attention(nn.Module):
             x = self.proj(x)
             x = self.proj_drop(x)  
         elif self.attn_implementation == "flash_attention":
-            with torch.nn.attention.sdpa_kernel(SDPBackend.FLASH_ATTENTION):
+            with torch.backends.cuda.sdp_kernel(enable_flash=True, enable_math=False, enable_mem_efficient=False):
                 dtype = k.dtype
-                with torch.autocast("cuda", dtype=torch.bfloat16):
+                with torch.autocast("cuda", dtype=torch.float16):
                     x = scaled_dot_product_attention(q, k, v, attn_mask=self.attn_mask, dropout_p=self.dropout_p, is_causal=self.is_causal, scale=scale)
                 if dtype == torch.float32:  # if input was FP32, cast back to FP32
                     x = x.to(torch.float32)
@@ -179,9 +180,9 @@ class Attention(nn.Module):
                 x = self.proj(x)
                 x = self.proj_drop(x)
         elif self.attn_implementation == "pytorch_auto":
-            with torch.nn.attention.sdpa_kernel([SDPBackend.EFFICIENT_ATTENTION,]):
+            with torch.backends.cuda.sdp_kernel(enable_flash=False, enable_math=False, enable_mem_efficient=True):
                 dtype = k.dtype
-                with torch.autocast("cuda", dtype=torch.bfloat16):
+                with torch.autocast("cuda", dtype=torch.float16):
                     x = scaled_dot_product_attention(q, k, v, attn_mask=self.attn_mask, dropout_p=self.dropout_p, is_causal=self.is_causal, scale=scale)
                 if dtype == torch.float32:  # if input was FP32, cast back to FP32
                     x = x.to(torch.float32)
@@ -299,11 +300,11 @@ class CrossAttention(nn.Module):
             x = self.proj(x)
             x = self.proj_drop(x)
         elif self.attn_implementation == "flash_attention":
-            with torch.nn.attention.sdpa_kernel(SDPBackend.FLASH_ATTENTION):
+            with torch.backends.cuda.sdp_kernel(enable_flash=True, enable_math=False, enable_mem_efficient=False):
                 # cast to BF16 to use flash_attention
-                q = q.to(torch.bfloat16)
-                k = k.to(torch.bfloat16)
-                v = v.to(torch.bfloat16)
+                q = q.to(torch.float16)
+                k = k.to(torch.float16)
+                v = v.to(torch.float16)
                 x = scaled_dot_product_attention(q, k, v, attn_mask=self.attn_mask, dropout_p=self.dropout_p, is_causal=self.is_causal, scale=self.scale)
                 # cast back to FP32
                 x = x.to(torch.float32)

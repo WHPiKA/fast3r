@@ -788,11 +788,12 @@ def create_demo(checkpoint_dir, examples_dir, output_dir, device: torch.device, 
 
     
     examples = [
-        "https://fast3r-3d.github.io/demo_examples/teddybear.mp4",
-        "https://fast3r-3d.github.io/demo_examples/kitchen.mp4",
-        "https://fast3r-3d.github.io/demo_examples/redkitchen.mp4",
-        "https://fast3r-3d.github.io/demo_examples/family.mp4",
-        "https://fast3r-3d.github.io/demo_examples/lighthouse.mp4",
+        # "https://fast3r-3d.github.io/demo_examples/teddybear.mp4",
+        # "https://fast3r-3d.github.io/demo_examples/kitchen.mp4",
+        # "https://fast3r-3d.github.io/demo_examples/redkitchen.mp4",
+        # "https://fast3r-3d.github.io/demo_examples/family.mp4",
+        # "https://fast3r-3d.github.io/demo_examples/lighthouse.mp4",
+        "/mnt/workspace/projects/fast3r/demo_examples/gnome/*.png"
     ]
     example_filenames = [os.path.basename(example) for example in examples]
 
@@ -1110,7 +1111,7 @@ def create_demo(checkpoint_dir, examples_dir, output_dir, device: torch.device, 
 def main():
     os.environ["GRADIO_TEMP_DIR"] = "./gradio_tmp_dir"
     parser = argparse.ArgumentParser(description="Fast3R 3D Reconstruction Demo...")
-    parser.add_argument("--checkpoint_dir", type=str, default="jedyang97/Fast3R_ViT_Large_512")
+    parser.add_argument("--checkpoint_dir", type=str, default="Fast3R_ViT_Large_512")
     parser.add_argument("--examples_dir", type=str, default="./demo_examples")
     parser.add_argument("--output_dir", type=str, default="./demo_outputs",
                         help="Directory to store processed scenes with feedback")
