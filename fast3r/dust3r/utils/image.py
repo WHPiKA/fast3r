@@ -70,7 +70,16 @@ def _resize_pil_image(img, long_edge_size):
     elif S <= long_edge_size:
         interp = PIL.Image.BICUBIC
     new_size = tuple(int(round(x * long_edge_size / S)) for x in img.size)
-    return img.resize(new_size, interp)
+
+    if img.mode == "RGBA":
+        r, g, b, a = img.split()
+        img = PIL.Image.merge("RGB", (r, g, b))
+        img = img.resize(new_size, interp)
+        a = a.resize(new_size, PIL.Image.NEAREST)
+        img = PIL.Image.merge("RGBA", (*img.split(), a))
+    else:
+        img = img.resize(new_size, interp)
+    return img
 
 
 def load_images(folder_or_list, size, square_ok=False, verbose=True, rotate_clockwise_90=False, crop_to_landscape=False):
@@ -97,7 +106,7 @@ def load_images(folder_or_list, size, square_ok=False, verbose=True, rotate_cloc
     for path in folder_content:
         if not path.lower().endswith(supported_images_extensions):
             continue
-        img = exif_transpose(PIL.Image.open(os.path.join(root, path))).convert("RGB")
+        img = exif_transpose(PIL.Image.open(os.path.join(root, path))).convert("RGBA")
         if rotate_clockwise_90:
             img = img.rotate(-90, expand=True)
         if crop_to_landscape:
@@ -144,12 +153,16 @@ def load_images(folder_or_list, size, square_ok=False, verbose=True, rotate_cloc
         W2, H2 = img.size
         if verbose:
             print(f" - adding {path} with resolution {W1}x{H1} --> {W2}x{H2}")
+
+        r, g, b, a = img.split()
+        img = PIL.Image.merge("RGB", (r, g, b))
         imgs.append(
             dict(
                 img=ImgNorm(img)[None],
                 true_shape=np.int32([img.size[::-1]]),
                 idx=len(imgs),
                 instance=str(len(imgs)),
+                mask=tvf.ToTensor()(a)[None],
             )
         )
 

@@ -1,5 +1,8 @@
 import os, glob
+import numpy as np
+from einops import rearrange
 import torch
+import open3d as o3d
 from fast3r.dust3r.utils.image import load_images
 from fast3r.dust3r.inference_multiview import inference
 from fast3r.models.fast3r import Fast3R
@@ -48,12 +51,40 @@ camera_poses = poses_c2w_batch[0]
 # Print camera poses for all views.
 for view_idx, pose in enumerate(camera_poses):
     print(f"Camera Pose for view {view_idx}:")
-    print(pose.shape)  # np.array of shape (4, 4), the camera-to-world transformation matrix
+    print(pose)  # np.array of shape (4, 4), the camera-to-world transformation matrix
 
 # --- Extract 3D Point Clouds for Each View ---
 # Each element in output_dict['preds'] corresponds to a view's point map.
+all_points = []
 for view_idx, pred in enumerate(output_dict['preds']):
     point_cloud = pred['pts3d_in_other_view'].cpu().numpy()
     print(f"Point Cloud Shape for view {view_idx}: {point_cloud.shape}")  # shape: (1, 368, 512, 3), i.e., (1, Height, Width, XYZ)
-    # Save
-    np.save(f"point_cloud_{view_idx}.npy", point_cloud)
+    all_points.append(point_cloud)
+
+masked_points = []
+for image, point_cloud in zip(images, all_points):
+    img = image['img'].cpu().numpy()
+    img = rearrange(img, 'b c h w -> b h w c')
+    img = img * 0.5 + 0.5
+    colored_points = np.concatenate([point_cloud, img], axis=-1)
+    mask = image['mask'].cpu().numpy().astype(bool)
+    mask = mask[:, 0]
+    print(f"Mask Shape: {mask.shape}")
+    colored_points = colored_points[mask].reshape(-1, 6)
+    masked_points.append(colored_points)
+    # pcd = o3d.geometry.PointCloud()
+    # pcd.points = o3d.utility.Vector3dVector(colored_points[:, :3])
+    # pcd.colors = o3d.utility.Vector3dVector(colored_points[:, 3:])
+
+# --- Combine All Points into a Single Point Cloud ---
+combined_points = np.concatenate(masked_points, axis=0)
+
+# --- Create an Open3D Point Cloud Object ---
+pcd = o3d.geometry.PointCloud()
+pcd.points = o3d.utility.Vector3dVector(combined_points[:, :3])
+pcd.colors = o3d.utility.Vector3dVector(combined_points[:, 3:])
+
+# --- Save the Point Cloud to a PCD File ---
+o3d.io.write_point_cloud("combined_point_cloud.ply", pcd)
+
+print("Point cloud saved as 'combined_point_cloud.ply'.")
